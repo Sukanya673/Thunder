@@ -14,13 +14,13 @@ struct DummyProcessContainer {
     char address[256];
 };
 
-void strcpy_safe(char* dest, const char* src, size_t bufferLength) 
+void strcpy_safe(char* dest, char* src, size_t bufferLength) 
 {
     strncpy(dest, src, bufferLength - 1);
     dest[bufferLength - 1] = '\0';
 }
 
-ContainerError process_container_logging(const char* logPath, const char* loggingOptions)
+ContainerError process_container_logging(char* logPath, char* loggingOptions)
 {
     printf("Global logging initialized to directory: %s\n", logPath);
 
@@ -41,7 +41,7 @@ ContainerError process_container_deinitialize()
     return ERROR_NONE;
 }
 
-ContainerError process_container_create(struct ProcessContainer** container, const char* id, const char** searchPaths, const char* logPath, const char* configuration)
+ContainerError process_container_create(struct ProcessContainer** container, char* id, char** searchPaths, char* logPath, char* configuration)
 {
     struct DummyProcessContainer* output = (struct DummyProcessContainer*)malloc(sizeof(struct DummyProcessContainer));
 
@@ -74,7 +74,7 @@ ContainerError process_container_destroy(struct ProcessContainer* container)
     return ERROR_NONE;
 }
 
-ContainerError process_container_start(struct ProcessContainer* container, const char* command, const char** params)
+ContainerError process_container_start(struct ProcessContainer* container, char* command, char** params)
 {
     printf("Executed %s command! with arguments:\n", command);
     for (int i = 0; params[i] != NULL; i++) {

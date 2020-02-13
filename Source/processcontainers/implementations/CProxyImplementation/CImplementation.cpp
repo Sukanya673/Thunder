@@ -6,6 +6,42 @@ namespace WPEFramework
     
 namespace ProcessContainers
 {
+    // NetworkInfo
+    // ----------------------------------
+    CNetworkInterfaceIterator::CNetworkInterfaceIterator(const ProcessContainer* container)
+        : NetworkInterfaceIterator()
+    {
+        if (process_container_network_status_create(const_cast<ProcessContainer*>(container), &_networkStatus) != ERROR_NONE) {
+            TRACE_L1("Failed to get network status for container \"%s\"", container->id);
+        }
+
+        _count = _networkStatus.numInterfaces;
+    }
+
+    CNetworkInterfaceIterator::~CNetworkInterfaceIterator()
+    {
+        if (process_container_network_status_destroy(&_networkStatus) != ERROR_NONE) {
+            TRACE_L1("Failed to release a network status");
+        }
+    }
+
+    string CNetworkInterfaceIterator::Name() const 
+    {
+        return _networkStatus.interfaces[_current].interfaceName;
+    }
+
+    uint32_t CNetworkInterfaceIterator::NumIPs() const
+    {
+        return _networkStatus.interfaces[_current].numIp;
+    }
+
+    string CNetworkInterfaceIterator::IP(uint32_t id) const
+    {
+        ASSERT(id < _networkStatus.interfaces[_current].numIp);
+
+        return _networkStatus.interfaces[_current].ips[id];
+    }
+
     // Container administrator
     // ----------------------------------
     IContainerAdministrator& ProcessContainers::IContainerAdministrator::Instance()
@@ -26,7 +62,8 @@ namespace ProcessContainers
         }
         sp[searchpaths.Count()] = nullptr;
 
-        ContainerError error = process_container_create(&container, id.c_str(), sp, logpath.c_str(), configuration.c_str());
+        ContainerError error = process_container_create(&container, const_cast<char*>(id.c_str())
+            , const_cast<char**>(sp), const_cast<char*>(logpath.c_str()), const_cast<char*>(configuration.c_str()));
 
         delete[] sp;
 
@@ -34,15 +71,15 @@ namespace ProcessContainers
             TRACE_L1("Failed to create container %s. Error code %d", id.c_str(), error);
             return nullptr;
         } else {
-
             _containers.push_back(new CContainer(container));
+
             return _containers.back();
         }
     }
 
     void CContainerAdministrator::Logging(const string& logPath, const string& loggingOptions)
     {
-        process_container_logging(logPath.c_str(), loggingOptions.c_str());
+        process_container_logging(const_cast<char*>(logPath.c_str()), const_cast<char*>(loggingOptions.c_str()));
     }
 
     CContainerAdministrator::ContainerIterator CContainerAdministrator::Containers()
@@ -148,29 +185,9 @@ namespace ProcessContainers
         return cpuInfo;
     }
     
-    std::vector<CContainer::NetworkInterface> CContainer::NetworkInterfaces() const
+    NetworkInterfaceIterator* CContainer::NetworkInterfaces() const
     {
-        std::vector<NetworkInterface> result;
-
-        ProcessContainerNetworkStatus networkStatus;
-        if (process_container_network_status_create(_container, &networkStatus) == ERROR_NONE) {
-
-            result.reserve(networkStatus.numInterfaces);
-
-            for (uint32_t i = 0; i < networkStatus.numInterfaces; i++) {
-                NetworkInterface interface;
-                interface.name = networkStatus.interfaces[i].interfaceName;
-                interface.IPs.reserve(networkStatus.interfaces[i].numIp);
-
-                for (uint32_t ipId = 0; ipId < networkStatus.interfaces[i].numIp; ++ipId) {
-                    interface.IPs.emplace_back(networkStatus.interfaces[i].ips[ipId]);
-                }
-            }
-        } else {
-            TRACE_L1("Failed to get network status for container \"%s\"", Id().c_str());
-        }
-
-        return result;
+        return new CNetworkInterfaceIterator(_container);
     }
 
     bool CContainer::IsRunning() const
@@ -189,7 +206,7 @@ namespace ProcessContainers
 
         params[parameters.Count()] = nullptr;
         
-        ContainerError error = process_container_start(_container, command.c_str(), params);
+        ContainerError error = process_container_start(_container, const_cast<char*>(command.c_str()), const_cast<char**>(params));
 
         delete[] params;
 
@@ -222,6 +239,8 @@ namespace ProcessContainers
         if (_refCount == 0) {
             delete this;
         }
+
+        return Core::ERROR_DESTRUCTION_SUCCEEDED;
     };
 
 } // namespace ProcessContainers
